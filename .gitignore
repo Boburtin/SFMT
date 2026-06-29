@@ -1,0 +1,5 @@
+bin/
+build/
+CLAUDE.md
+.env
+.clang-format
