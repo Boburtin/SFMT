@@ -132,7 +132,7 @@ struct TokenFlags {
 template <class T>
 class SingleArray {
    public:
-    SingleArray(uint32_t n) : data_ {std::make_unique_for_overwrite<T[]>(n)}, size_ {}, cap_ {n} {}
+    SingleArray(uint32_t n) : data_ { std::make_unique_for_overwrite<T[]>(n) }, size_ {}, cap_ { n } {}
 
     T& operator[](uint32_t index) { return data_[index]; }
     const T& operator[](uint32_t index) const { return data_[index]; }

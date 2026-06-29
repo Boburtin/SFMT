@@ -185,29 +185,37 @@ class Tokenizer {
                     return { start, Tag::number, flags };
 
                 case State::seen_semicolon:
-                    if (c == '\r') {
-                        state = State::seen_cr;
-                        start = pos_++;
-                        continue;
-                    }
                     if (c == '\n') { return { pos_++, Tag::endstmt, flags }; }
+                    if (c == '\r') {
+                        start = pos_;
+                        state = State::seen_cr;
+                    }
                     ++pos_;
                     continue;
 
                 case State::seen_at:
                     ++pos_;
-                    if (c == '@') { return { start, Tag::at_at, flags }; }
+                    if (is_at(c)) { return { start, Tag::at_at, flags }; }
                     if (is_fw(c)) { return { start, Tag::at_fw, flags }; }
                     if (is_bk(c)) { return { start, Tag::at_bk, flags }; }
                     return { start, Tag::none, flags };
 
                 case State::seen_cr:
-                    if (c == '\n') ++pos_;
+                    if (c == '\n') ++pos_;  // advance past crlf
                     return { start, Tag::endstmt, flags };
 
                 case State::seen_angle_left:
+                    if (c != '<') { return { start, Tag::l_angle_bracket, flags }; }
+                    ++pos_;
+                    return { start, Tag::l_shift, flags };
+
                 case State::seen_angle_right:
+                    if (c != '>') { return { start, Tag::r_angle_bracket, flags }; }
+                    ++pos_;
+                    return { start, Tag::r_shift, flags };
+
                 case State::in_num_malformed:
+
                 case State::in_zero_start:
                 case State::in_unprefixed_hex:
                 case State::in_prefixed_hex:

@@ -42,7 +42,7 @@ class SourceBytes {
    private:
     static Result<void> strip_bom(std::string& buf) {
         unsigned char aa, ab, ac;
-        if (auto len {buf.size()}; len >= 2) {
+        if (auto len { buf.size() }; len >= 2) {
             aa = static_cast<unsigned char>(buf[0]), ab = static_cast<unsigned char>(buf[1]);
             if ((aa == 0xFF && ab == 0xFE) || (aa == 0xFE && ab == 0xFF))
                 return diagnostic_error(FileCode::encoding_unsupported);
@@ -60,7 +60,7 @@ class SourceBytes {
 
     void build_line_starts() {
         for (std::size_t i {}; i < buffer_.size(); ++i) {
-            char c {buffer_[i]};
+            char c { buffer_[i] };
             if (c == '\n') line_starts_.push_back(i + 1);
             else if (c == '\r') {
                 if (buffer_[i + 1] == '\n') ++i;

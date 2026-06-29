@@ -9,6 +9,6 @@ int main(int argc, const char** argv) {
         return 2;
     }
     ++argv;
-    for (auto i {argc}; i-- > 1;) { std::println("{}", argv[argc - i - 1]); }
+    for (auto i { argc }; i-- > 1;) { std::println("{}", argv[argc - i - 1]); }
     return 0;
 }
