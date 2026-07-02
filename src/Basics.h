@@ -46,8 +46,9 @@ enum class Tag : uint8_t {
     dollar_sign,
     double_dollar_sign,
     at_at,
-    at_bk,
-    at_fw,
+    at_back,
+    at_forward,
+    percent,
     endstmt,
     // keywords
     kw_common,
@@ -122,6 +123,9 @@ struct TokenFlags {
     bool has(uint8_t bit) const { return bits & bit; }
     void set(uint8_t bit) { bits |= bit; }
     void clear(uint8_t bit) { bits &= ~bit; }
+
+    uint8_t operator|(uint8_t bit) const { return bits | bit; }
+    uint8_t operator|(Radix r) const { return (bits & ~radix_mask) | r; }
 
     Radix radix() const { return static_cast<Radix>(bits & radix_mask); }
     void set_radix(Radix r) { bits = (bits & ~radix_mask) | r; }
