@@ -26,7 +26,6 @@ class Tokenizer {
     char get() const { return src_[pos_]; }
 
    private:
-
     struct Token {
         uint32_t start;
         Tag tag;

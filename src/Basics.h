@@ -10,7 +10,7 @@ using std::uint32_t, std::uint16_t, std::uint8_t, std::size_t;
 
 /* primary token identifier | keep to tokens and keywords only */
 enum class Tag : uint8_t {
-    none,
+    none = 0,
     eof,
     string,
     number,
@@ -51,7 +51,7 @@ enum class Tag : uint8_t {
     percent,
     endstmt,
     // keywords
-    kw_common,
+    kw_common = 40,
     kw_forward,
     kw_reverse,
     kw_local,
