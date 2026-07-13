@@ -6,7 +6,7 @@
 #include <memory>
 #include <utility>
 
-using std::uint32_t, std::uint16_t, std::uint8_t, std::size_t;
+using std::uint64_t, std::uint32_t, std::uint16_t, std::uint8_t, std::size_t;
 
 /* primary token identifier | keep to tokens and keywords only */
 enum class Tag : uint8_t {
@@ -136,7 +136,8 @@ struct TokenFlags {
 template <class T>
 class SingleArray {
    public:
-    SingleArray(uint32_t n) : data_ { std::make_unique_for_overwrite<T[]>(n) }, size_ {}, cap_ { n } {}
+    SingleArray(uint32_t n)
+        : data_ { std::make_unique_for_overwrite<T[]>(n) }, size_ {}, cap_ { n } {}
 
     T& operator[](uint32_t index) { return data_[index]; }
     const T& operator[](uint32_t index) const { return data_[index]; }
