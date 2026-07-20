@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string_view>
+#include <utility>
 
 #include "Classify.h"
 #include "Keywords.h"
@@ -53,8 +54,7 @@ class Tokenizer {
             seen_cr_after_bslash,
             in_space_after_bslash,
             in_num_malformed,
-            in_zero_start,
-            in_nonzero_start,
+            in_unprefixed_num,
             in_unprefixed_hex,
             in_prefixed_hex,
             in_float,
@@ -65,7 +65,6 @@ class Tokenizer {
             in_string_double,
             in_identifier,
             in_potential_kw,
-            temp_done
         };
 
         uint32_t start { pos_ };
@@ -134,9 +133,10 @@ class Tokenizer {
                             }
                             if (is_dec(c)) {
                                 ++pos_;
-                                state = State::in_nonzero_start;
+                                state = State::in_unprefixed_num;
                                 continue;
                             }
+                            return { (++pos_, start), Tag::none, flags | TokenFlags::has_error };
                         }
                     }
                 }
@@ -159,8 +159,9 @@ class Tokenizer {
                             : is_bin_post(c)       ? State::seen_bin_post
                             : is_float_post(c)     ? State::seen_float_post
                             : is_float_e(c)        ? State::in_float_e
-                            : is_a_or_c(c)         ? State::in_zero_start
+                            : is_a_or_c(c)         ? State::in_unprefixed_hex
                             : is_ident_nondigit(c) ? State::in_num_malformed
+                            : is_dec(c)            ? State::in_unprefixed_num
                                                    : State::start;
                     if (state != State::start) {
                         ++pos_;
@@ -214,6 +215,13 @@ class Tokenizer {
                 }
 
                 case State::seen_float_post_after_dot: {
+                    if (!is_ident_alnum(c)) {
+                        flags.set(TokenFlags::is_float);
+                        return { start, Tag::number, flags };
+                    }
+                    ++pos_;
+                    state = State::in_num_malformed;
+                    continue;
                 }
 
                 case State::seen_semicolon: {
@@ -253,17 +261,19 @@ class Tokenizer {
                     if (is_space(c)) {
                         ++pos_;
                         state = State::in_space_after_bslash;
+                        flags.clear(TokenFlags::has_escape);
                         continue;
                     }
                     if (is_cr(c)) {
                         ++pos_;
                         state = State::seen_cr_after_bslash;
+                        flags.clear(TokenFlags::has_escape);
                         continue;
                     }
                     if (is_lf(c)) {
-                        ++pos_;
-                        start = pos_;
+                        start = ++pos_;
                         state = State::start;
+                        flags.clear(TokenFlags::has_escape);
                         continue;
                     }
                     flags.set(TokenFlags::has_escape);
@@ -308,7 +318,7 @@ class Tokenizer {
                     return { start, Tag::number, flags | TokenFlags::has_error };
                 }
 
-                case State::in_zero_start: {
+                case State::in_unprefixed_num: {
                     state = is_period(c)           ? State::in_float
                             : is_hex_post(c)       ? State::seen_hex_post
                             : is_dec_post(c)       ? State::seen_dec_post
@@ -318,8 +328,8 @@ class Tokenizer {
                             : is_float_e(c)        ? State::in_float_e
                             : is_a_or_c(c)         ? State::in_unprefixed_hex
                             : is_ident_nondigit(c) ? State::in_num_malformed
-                                                   : State::in_zero_start;
-                    if (state != State::in_zero_start || is_dec(c)) {
+                                                   : State::in_unprefixed_num;
+                    if (state != State::in_unprefixed_num || is_dec(c)) {
                         ++pos_;
                         continue;
                     }
@@ -348,15 +358,26 @@ class Tokenizer {
                 }
 
                 case State::in_float: {
-                    state = is_float_post(c)       ? State::seen_float_post_after_dot
-                            : is_float_e(c)        ? State::in_float_e
-                            : is_ident_nondigit(c) ? State::in_num_malformed
-                                                   : State::in_float;
-                    if (state != State::in_float || is_dec(c)) {
+                    if (is_float_post(c)) {
+                        ++pos_;
+                        state = State::seen_float_post_after_dot;
+                        continue;
+                    }
+                    if (is_float_e(c)) {
+                        ++pos_;
+                        state = State::in_float_e;
+                        continue;
+                    }
+                    if (is_dec(c)) {
                         ++pos_;
                         continue;
                     }
                     flags.set(TokenFlags::is_float);
+                    if (is_ident_nondigit(c)) {
+                        ++pos_;
+                        state = State::in_num_malformed;
+                        continue;
+                    }
                     return { start, Tag::number, flags };
                 }
 
@@ -442,7 +463,7 @@ class Tokenizer {
                     std::memcpy(bw.w, buf, sizeof(bw.w));
                     return { start, kw_lookup(bw, buf_len), flags };
                 }
-                default: continue;
+                default: std::unreachable();
             }
         }
     }
