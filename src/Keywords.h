@@ -6,12 +6,9 @@
 #include <string_view>
 #include <utility>
 
-/* Find out if idiomatic to include cstdint even when Basics has the alias defs */
-
 #include "Basics.h"
 
 /* NOTE: trying length bucket approach now but will want to switch to perfect hash functions */
-
 constexpr std::string_view kw_src[] = {
     "common", "forward", "reverse", "local",   "while", "repeat",   "match",     "macro",
     "struc",  "restruc", "struct",  "end",     "if",    "else",     "include",   "db",
@@ -24,6 +21,7 @@ constexpr std::string_view kw_src[] = {
 
 constexpr auto kw_count = std::size(kw_src);
 constexpr auto kw_first = std::to_underlying(Tag::kw_common);
+
 static_assert(size_t(std::to_underlying(Tag::kw_gui) - kw_first + 1) == kw_count,
               "kw_src out of sync with Tag enum block");
 
@@ -43,12 +41,12 @@ struct KwWords {
     uint64_t w[W];
 };
 
-constexpr KwWords kw_pack(std::string_view s) {  // pack bytes into (2 * uint64_t) k
+constexpr KwWords kw_pack(std::string_view s) {  // pack bytes into W
     KwWords k {};
     for (size_t i {}; i < s.size(); ++i) { k.w[i / 8] |= uint64_t(uint8_t(s[i])) << (8 * (i % 8)); }
     return k;
 }
-// bad alignment. Fix.
+
 struct KwKey {
     KwWords words;
     Tag tag;

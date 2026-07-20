@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <string_view>
 
 #include "Classify.h"
@@ -72,7 +73,7 @@ class Tokenizer {
 
         State state {};
 
-        char buf[16] {};
+        char buf[8 * W] {};
         uint8_t buf_len {};
 
         while (true) {  // continue jumps to here
@@ -86,30 +87,33 @@ class Tokenizer {
                             flags.set(TokenFlags::follows_space);
                             continue;
                         }
-                        case '-' : return { pos_++, Tag::minus, flags };
-                        case '+' : return { pos_++, Tag::plus, flags };
-                        case '/' : return { pos_++, Tag::slash, flags };
-                        case '*' : return { pos_++, Tag::asterisk, flags };
-                        case '%' : return { pos_++, Tag::percent, flags };
-                        case '=' : return { pos_++, Tag::equal, flags };
-                        case '`' : return { pos_++, Tag::backtick, flags };
-                        case '?' : return { pos_++, Tag::question, flags };
-                        case '#' : return { pos_++, Tag::hash, flags };
-                        case '!' : return { pos_++, Tag::bang, flags };
-                        case '|' : return { pos_++, Tag::pipe, flags };
-                        case '.' : return { pos_++, Tag::dot, flags };
-                        case ':' : return { pos_++, Tag::colon, flags };
-                        case ',' : return { pos_++, Tag::comma, flags };
-                        case '~' : return { pos_++, Tag::tilde, flags };
-                        case '&' : return { pos_++, Tag::ampersand, flags };
-                        case '[' : return { pos_++, Tag::l_bracket, flags };
-                        case ']' : return { pos_++, Tag::r_bracket, flags };
-                        case '(' : return { pos_++, Tag::l_paren, flags };
-                        case ')' : return { pos_++, Tag::r_paren, flags };
-                        case '{' : return { pos_++, Tag::l_brace, flags };
-                        case '}' : return { pos_++, Tag::r_brace, flags };
-                        case '\n': return { pos_++, Tag::endstmt, flags };
-                        case '\0': return { pos_, Tag::eof, flags };
+                        case '-' : return { (++pos_, start), Tag::minus, flags };
+                        case '+' : return { (++pos_, start), Tag::plus, flags };
+                        case '/' : return { (++pos_, start), Tag::slash, flags };
+                        case '*' : return { (++pos_, start), Tag::asterisk, flags };
+                        case '%' : return { (++pos_, start), Tag::percent, flags };
+                        case '=' : return { (++pos_, start), Tag::equal, flags };
+                        case '`' : return { (++pos_, start), Tag::backtick, flags };
+                        case '?' : return { (++pos_, start), Tag::question, flags };
+                        case '#' : return { (++pos_, start), Tag::hash, flags };
+                        case '!' : return { (++pos_, start), Tag::bang, flags };
+                        case '|' : return { (++pos_, start), Tag::pipe, flags };
+                        case '.' : return { (++pos_, start), Tag::dot, flags };
+                        case ':' : return { (++pos_, start), Tag::colon, flags };
+                        case ',' : return { (++pos_, start), Tag::comma, flags };
+                        case '~' : return { (++pos_, start), Tag::tilde, flags };
+                        case '&' : return { (++pos_, start), Tag::ampersand, flags };
+                        case '[' : return { (++pos_, start), Tag::l_bracket, flags };
+                        case ']' : return { (++pos_, start), Tag::r_bracket, flags };
+                        case '(' : return { (++pos_, start), Tag::l_paren, flags };
+                        case ')' : return { (++pos_, start), Tag::r_paren, flags };
+                        case '{' : return { (++pos_, start), Tag::l_brace, flags };
+                        case '}' : return { (++pos_, start), Tag::r_brace, flags };
+                        case '\n': return { (++pos_, start), Tag::endstmt, flags };
+                        case '\0': {
+                            if (flags.has(TokenFlags::has_escape)) flags.set(TokenFlags::has_error);
+                            return { pos_, Tag::eof, flags };
+                        }
                         case '\r': state = (++pos_, State::seen_cr); continue;
                         case '@' : state = (++pos_, State::seen_at); continue;
                         case '_' : state = (++pos_, State::in_identifier); continue;
@@ -166,21 +170,27 @@ class Tokenizer {
                 }
 
                 case State::seen_hex_post: {
-                    if (!is_ident_alnum(c)) { return { start, Tag::number, flags | TokenFlags::hex }; }
+                    if (!is_ident_alnum(c)) {
+                        return { start, Tag::number, flags | TokenFlags::hex };
+                    }
                     ++pos_;
                     state = State::in_num_malformed;
                     continue;
                 }
 
                 case State::seen_oct_post: {
-                    if (!is_ident_alnum(c)) { return { start, Tag::number, flags | TokenFlags::oct }; }
+                    if (!is_ident_alnum(c)) {
+                        return { start, Tag::number, flags | TokenFlags::oct };
+                    }
                     ++pos_;
                     state = State::in_num_malformed;
                     continue;
                 }
 
                 case State::seen_bin_post: {
-                    if (!is_ident_alnum(c)) { return { start, Tag::number, flags | TokenFlags::bin }; }
+                    if (!is_ident_alnum(c)) {
+                        return { start, Tag::number, flags | TokenFlags::bin };
+                    }
                     ++pos_;
                     state = is_hex(c) ? State::in_unprefixed_hex : State::in_num_malformed;
                     continue;
@@ -240,19 +250,54 @@ class Tokenizer {
                 }
 
                 case State::seen_backslash: {
-                    state = is_space(c) ? State::in_space_after_bslash
-                            : is_cr(c)  ? State::seen_cr_after_bslash
-                                        : State::start;
-                    if (state != State::start || is_lf(c)) {
+                    if (is_space(c)) {
                         ++pos_;
-                    } else flags.set(TokenFlags::has_escape);
+                        state = State::in_space_after_bslash;
+                        continue;
+                    }
+                    if (is_cr(c)) {
+                        ++pos_;
+                        state = State::seen_cr_after_bslash;
+                        continue;
+                    }
+                    if (is_lf(c)) {
+                        ++pos_;
+                        start = pos_;
+                        state = State::start;
+                        continue;
+                    }
+                    flags.set(TokenFlags::has_escape);
+                    state = State::start;
                     continue;
                 }
 
                 case State::seen_cr_after_bslash: {
+                    if (is_lf(c)) { ++pos_; }
+                    state = State::start;
+                    start = pos_;
+                    continue;
                 }
 
                 case State::in_space_after_bslash: {
+                    if (is_space(c)) {
+                        ++pos_;
+                        continue;
+                    }
+                    if (is_cr(c)) {
+                        ++pos_;
+                        state = State::seen_cr_after_bslash;
+                        continue;
+                    }
+                    if (is_lf(c)) {
+                        ++pos_;
+                        start = pos_;
+                        state = State::start;
+                        continue;
+                    }
+                    flags.set(TokenFlags::has_error);
+                    start = pos_;
+                    state = State::start;
+                    continue;
                 }
 
                 case State::in_num_malformed: {
@@ -374,13 +419,29 @@ class Tokenizer {
                 case State::in_identifier: {
                     if (is_ident_alnum(c)) {
                         ++pos_;
-                    } else {
+                        continue;
                     }
+                    return { start, Tag::identifier, flags };
                 }
 
                 case State::in_potential_kw: {
+                    if (is_alpha(c)) {
+                        if (buf_len == kw_max_len) {
+                            state = State::in_identifier;
+                            continue;
+                        }
+                        buf[buf_len++] = c | 0x20;
+                        ++pos_;
+                        continue;
+                    }
+                    if (is_non_kw(c)) {
+                        state = State::in_identifier;
+                        continue;
+                    }
+                    KwWords bw {};
+                    std::memcpy(bw.w, buf, sizeof(bw.w));
+                    return { start, kw_lookup(bw, buf_len), flags };
                 }
-
                 default: continue;
             }
         }
